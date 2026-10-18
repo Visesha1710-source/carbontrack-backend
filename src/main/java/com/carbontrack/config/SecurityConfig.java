@@ -4,8 +4,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -14,10 +15,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 
 import com.carbontrack.user.AppUserDetailsService;
-
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-
 
 import java.util.List;
 
@@ -31,28 +28,28 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationManager authenticationManager(
-        AuthenticationConfiguration configuration)
-        throws Exception {
-            return configuration.getAuthenticationManager();
-        }
+            AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
 
     @Bean
-public DaoAuthenticationProvider authenticationProvider(
-        AppUserDetailsService userDetailsService,
-        PasswordEncoder passwordEncoder) {
+    public DaoAuthenticationProvider authenticationProvider(
+            AppUserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder) {
 
-    DaoAuthenticationProvider provider =
-            new DaoAuthenticationProvider(userDetailsService);
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider(userDetailsService);
 
-    provider.setPasswordEncoder(passwordEncoder);
-    return provider;
-}
+        provider.setPasswordEncoder(passwordEncoder);
+        return provider;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             DaoAuthenticationProvider authenticationProvider,
-            @Value("${app.cors.allowed-origins:http://localhost:3000}") List<String> allowedOrigins)
-            throws Exception {
+            @Value("${app.cors.allowed-origins:http://localhost:3000}")
+            List<String> allowedOrigins) throws Exception {
 
         http
             .cors(cors -> cors.configurationSource(request -> {
@@ -71,10 +68,25 @@ public DaoAuthenticationProvider authenticationProvider(
             )
             .authenticationProvider(authenticationProvider)
             .authorizeHttpRequests(auth -> auth
+
+                // Public health check
+                .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+
+                // Public Swagger documentation
+                .requestMatchers(
+                    "/v3/api-docs",
+                    "/v3/api-docs/**",
+                    "/swagger-ui.html",
+                    "/swagger-ui/**"
+                ).permitAll()
+
+                // Public authentication endpoints
                 .requestMatchers(HttpMethod.POST,
                     "/api/auth/register",
                     "/api/auth/login"
                 ).permitAll()
+
+                // All other endpoints remain protected
                 .anyRequest().authenticated()
             )
             .httpBasic(basic -> basic.disable())
